@@ -1,11 +1,27 @@
 import json
 import os
 import requests
+import logging
 
 from dotenv import load_dotenv
 from src.config import BASE_URL, GET_DATE, QUERY
 
+# import log_config
+#
+# logger = log_config.get_logger(__name__)
+
+logger = logging.getLogger(__name__)
+file_handler = logging.FileHandler('logs/news.log', "w", encoding="UTF-8")
+file_formatter = logging.Formatter(
+    "[%(asctime)s.%(msecs)03d] [%(levelname)-7s] - %(name)r - (%(filename)s).%(funcName)s:%(lineno)-3d - %(message)s"
+)
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
+
+logger.warning("Получение АPI")
 load_dotenv()
+logger.info('API получено')
 API_KEY = os.getenv("API_KEY_NEWS")
 
 
@@ -17,6 +33,7 @@ def get_news(exclude_words: list, query: str = QUERY, api_key: str = API_KEY) ->
         "apiKey": api_key
     }
     try:
+        logger.info("Выполнение запроса с ключевыми словами: %s", query)
         response = requests.get(
             url=BASE_URL,
             params=params
@@ -24,6 +41,7 @@ def get_news(exclude_words: list, query: str = QUERY, api_key: str = API_KEY) ->
 
         news_data = response.json()
         if news_data.get('status') != 'ok':
+            logger.warning("Статей не нашлось")
             return []
 
         articacles_list = news_data.get('articles', [])
@@ -35,6 +53,7 @@ def get_news(exclude_words: list, query: str = QUERY, api_key: str = API_KEY) ->
             title = article.get('title').lower()
 
             flag = False
+            logger.info("Фильтруем новости по словам исключениям: %s", ','.join(exclude_words))
             for word in exclude_words:
                 if word.lower() in content or word in title:
                     flag = True
@@ -47,9 +66,12 @@ def get_news(exclude_words: list, query: str = QUERY, api_key: str = API_KEY) ->
                     'url': article.get('url')
                 })
         return result
-    except requests.RequestException:
+    except requests.RequestException as ex:
+        logger.error("Произошла ошибка: %s", ex)
         return []
-    except json.JSONDecoder:
+    except json.JSONDecoder as ex:
+        logger.error("Произошла ошибка: %s", ex)
         return []
-    except Exception:
+    except Exception as ex:
+        logger.error("Произошла ошибка: %s", ex)
         return []
